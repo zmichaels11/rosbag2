@@ -269,11 +269,7 @@ TEST_F(RecordFixture, record_end_to_end_with_splitting_bagsize_split_is_at_least
       const auto bagfile_path =
         (rcpputils::fs::path(root_bag_path_) / bagfile_name.str());
 
-      if (bagfile_path.exists()) {
-        metadata.relative_file_paths.push_back(bagfile_path.string());
-      } else {
-        break;
-      }
+      metadata.relative_file_paths.push_back(bagfile_path.string());
     }
 
     metadata_io.write_metadata(root_bag_path_, metadata);

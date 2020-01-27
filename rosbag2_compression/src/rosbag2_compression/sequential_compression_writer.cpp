@@ -211,6 +211,7 @@ void SequentialCompressionWriter::compress_last_file()
   ROSBAG2_COMPRESSION_LOG_DEBUG_STREAM("Compressing \"" << to_compress << "\"");
 
   metadata_.relative_file_paths.back() = compressor_->compress_uri(to_compress);
+  rcpputils::fs::remove(rcpputils::fs::path{to_compress});
 }
 
 void SequentialCompressionWriter::split_bagfile()
