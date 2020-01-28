@@ -55,6 +55,10 @@ std::shared_ptr<test_msgs::msg::Strings> create_string_message(
 }
 }  // namespace
 
+// TODO(zmichaels11): Disabled test on Windows since Ctrl-C signal cannot be correctly passed.
+// This test relies on the bagfile being compressed in the dtor.
+// This gets skipped on Windows due to the incapability of sending SIGINT programmatically.
+#ifndef _WIN32
 TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
   constexpr const char message_contents[] = "test";
   auto message = get_messages_strings()[0];
@@ -82,23 +86,6 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
 
   stop_execution(process_handle);
 
-  // TODO(zmichaels11): Find out how to correctly send a Ctrl-C signal on Windows
-  // This is necessary as the process is killed hard on Windows and doesn't write a metadata file
-#ifdef _WIN32
-  rosbag2_storage::BagMetadata metadata{};
-  metadata.version = 3;
-  metadata.storage_identifier = "sqlite3";
-  metadata.relative_file_paths = {database_path_ + ".zstd"};
-  metadata.duration = std::chrono::nanoseconds{0};
-  metadata.starting_time =
-    std::chrono::time_point<std::chrono::high_resolution_clock>{std::chrono::nanoseconds{0}};
-  metadata.message_count = 0;
-  metadata.compression_mode = "file";
-  metadata.compression_format = "zstd";
-  rosbag2_storage::MetadataIo metadata_io;
-  metadata_io.write_metadata(root_bag_path_, metadata);
-#endif
-
   const auto compressed_database_path = database_path_ + ".zstd";
   ASSERT_TRUE(rcpputils::fs::path(compressed_database_path).exists()) <<
     "Could not find compressed_database_path: " << compressed_database_path;
@@ -120,6 +107,7 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
 
   EXPECT_EQ(get_rwm_format_for_topic("/test_topic", db), rmw_get_serialization_format());
 }
+#endif
 
 TEST_F(RecordFixture, record_end_to_end_test) {
   auto message = get_messages_strings()[0];
@@ -221,8 +209,10 @@ TEST_F(RecordFixture, record_end_to_end_with_splitting_metadata_contains_all_top
   }
 
   // Verify that first_topic_name and second_topic_name are both in the metadata.
-  EXPECT_NE(topic_names.end(), topic_names.find(first_topic_name));
-  EXPECT_NE(topic_names.end(), topic_names.find(second_topic_name));
+  EXPECT_NE(topic_names.end(), topic_names.find(first_topic_name)) <<
+    "Could not find '" << first_topic_name << "' in subscribed list!";
+  EXPECT_NE(topic_names.end(), topic_names.find(second_topic_name)) <<
+    "Could not find '" << second_topic_name << "' in subscribed list!";
 }
 #endif
 
