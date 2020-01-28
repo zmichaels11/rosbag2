@@ -48,6 +48,14 @@ FILE * open_file(const std::string & uri, const std::string & read_mode)
 #else
   fp = std::fopen(uri.c_str(), read_mode.c_str());
 #endif
+
+  if (fp == nullptr) {
+    std::stringstream errmsg;
+    errmsg << "Error (" << errno << ") when trying to open file: " << uri;
+
+    throw std::runtime_error{errmsg.str()};
+  }
+
   return fp;
 }
 
@@ -61,13 +69,6 @@ std::vector<uint8_t> get_input_buffer(const std::string & uri)
 {
   // Read in buffer, handling accordingly
   const auto file_pointer = open_file(uri.c_str(), "rb");
-  if (file_pointer == nullptr) {
-    std::stringstream errmsg;
-    errmsg << "Failed to open file: \"" << uri << "\" for binary reading!";
-
-    throw std::runtime_error{errmsg.str()};
-  }
-
   const auto compressed_buffer_length = rcutils_get_file_size(uri.c_str());
   if (compressed_buffer_length == 0) {
     fclose(file_pointer);

@@ -49,6 +49,13 @@ FILE * open_file(const std::string & uri, const std::string & read_mode)
 #else
   fp = std::fopen(uri.c_str(), read_mode.c_str());
 #endif
+
+  if (fp == nullptr) {
+    std::stringstream errmsg;
+    errmsg << "Error " << errno << " when trying to open file: " << uri;
+
+    throw std::runtime_error{errmsg.str()};
+  }
   return fp;
 }
 
@@ -61,10 +68,6 @@ std::vector<uint8_t> get_input_buffer(const std::string & uri)
 {
   // Read in buffer, handling accordingly
   const auto file_pointer = open_file(uri.c_str(), "rb");
-  if (file_pointer == nullptr) {
-    throw std::runtime_error{"Error opening file"};
-  }
-
   const auto decompressed_buffer_length = rcutils_get_file_size(uri.c_str());
 
   if (decompressed_buffer_length == 0) {
@@ -90,7 +93,9 @@ std::vector<uint8_t> get_input_buffer(const std::string & uri)
 
   if (ferror(file_pointer)) {
     fclose(file_pointer);
-    throw std::runtime_error{"Unable to read file"};
+    std::stringstream errmsg;
+    errmsg << "Unable to read file: '" << uri << "'";
+    throw std::runtime_error{errmsg.str()};
   }
   fclose(file_pointer);
   return decompressed_buffer;
@@ -127,7 +132,9 @@ void write_output_buffer(
 
   if (ferror(file_pointer)) {
     fclose(file_pointer);
-    throw std::runtime_error{"Unable to write compressed file"};
+    std::stringstream errmsg;
+    errmsg << "Unable to write compressed file: '" << uri << "'";
+    throw std::runtime_error{errmsg.str()};
   }
   fclose(file_pointer);
 }

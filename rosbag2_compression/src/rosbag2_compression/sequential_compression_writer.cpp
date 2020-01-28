@@ -206,11 +206,14 @@ void SequentialCompressionWriter::compress_last_file()
     throw std::runtime_error{"Compressor was not opened!"};
   }
 
-  const auto & to_compress = metadata_.relative_file_paths.back();
+  const auto to_compress = metadata_.relative_file_paths.back();
 
   ROSBAG2_COMPRESSION_LOG_DEBUG_STREAM("Compressing \"" << to_compress << "\"");
 
-  metadata_.relative_file_paths.back() = compressor_->compress_uri(to_compress);
+  const auto compressed_uri = compressor_->compress_uri(to_compress);
+
+  metadata_.relative_file_paths.back() = compressed_uri;
+
   rcpputils::fs::remove(rcpputils::fs::path{to_compress});
 }
 

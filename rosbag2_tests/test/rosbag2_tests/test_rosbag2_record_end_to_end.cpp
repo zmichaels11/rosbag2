@@ -56,12 +56,10 @@ std::shared_ptr<test_msgs::msg::Strings> create_string_message(
 }  // namespace
 
 TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
+  constexpr const char message_contents[] = "test";
   auto message = get_messages_strings()[0];
-  message->string_value = "test";
+  message->string_value = message_contents;
   size_t expected_test_messages = 3;
-
-  auto wrong_message = get_messages_strings()[0];
-  wrong_message->string_value = "wrong_content";
 
   std::stringstream cmd;
   cmd << "ros2 bag record" <<
@@ -73,7 +71,6 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
   wait_for_db();
 
   pub_man_.add_publisher("/test_topic", message, expected_test_messages);
-  pub_man_.add_publisher("/wrong_topic", wrong_message);
 
   rosbag2_storage_plugins::SqliteWrapper db{
     database_path_,
@@ -91,7 +88,7 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
   rosbag2_storage::BagMetadata metadata{};
   metadata.version = 3;
   metadata.storage_identifier = "sqlite3";
-  metadata.relative_file_paths = {"bag_0.db3.zstd"};
+  metadata.relative_file_paths = {database_path_ + ".zstd"};
   metadata.duration = std::chrono::nanoseconds{0};
   metadata.starting_time =
     std::chrono::time_point<std::chrono::high_resolution_clock>{std::chrono::nanoseconds{0}};
@@ -103,22 +100,25 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression) {
 #endif
 
   const auto compressed_database_path = database_path_ + ".zstd";
-  ASSERT_TRUE(rcpputils::fs::path(compressed_database_path).exists());
+  ASSERT_TRUE(rcpputils::fs::path(compressed_database_path).exists()) <<
+    "Could not find compressed_database_path: " << compressed_database_path;
 
   rosbag2_compression::ZstdDecompressor decompressor;
 
   const auto decompressed_uri = decompressor.decompress_uri(compressed_database_path);
 
   ASSERT_EQ(decompressed_uri, database_path_);
+  ASSERT_TRUE(rcpputils::fs::exists(rcpputils::fs::path{database_path_})) <<
+    "Uncompressed uri: '" << database_path_ << "' does not exist!";
 
-  auto test_topic_messages = get_messages_for_topic<test_msgs::msg::Strings>("/test_topic");
-  EXPECT_THAT(test_topic_messages, SizeIs(Ge(expected_test_messages)));
-  EXPECT_THAT(test_topic_messages,
-    Each(Pointee(Field(&test_msgs::msg::Strings::string_value, "test"))));
-  EXPECT_THAT(get_rwm_format_for_topic("/test_topic", db), Eq(rmw_get_serialization_format()));
+  const auto test_topic_messages = get_messages_for_topic<test_msgs::msg::Strings>("/test_topic");
 
-  auto wrong_topic_messages = get_messages_for_topic<test_msgs::msg::BasicTypes>("/wrong_topic");
-  EXPECT_THAT(wrong_topic_messages, IsEmpty());
+  EXPECT_GE(test_topic_messages.size(), expected_test_messages);
+  for (const auto & message : test_topic_messages) {
+    EXPECT_EQ(message->string_value, message_contents);
+  }
+
+  EXPECT_EQ(get_rwm_format_for_topic("/test_topic", db), rmw_get_serialization_format());
 }
 
 TEST_F(RecordFixture, record_end_to_end_test) {
@@ -471,8 +471,9 @@ TEST_F(RecordFixture, record_end_to_end_test_with_zstd_file_compression_compress
   for (const auto & path : metadata.relative_file_paths) {
     const auto file_path = rcpputils::fs::path(path);
 
-    EXPECT_TRUE(file_path.exists());
-    EXPECT_EQ(file_path.extension().string(), ".zstd");
+    EXPECT_TRUE(file_path.exists()) << "Could not find path: " << file_path.string();
+    EXPECT_EQ(file_path.extension().string(), ".zstd") <<
+      "File path does not include zstd extension (" << file_path.string() << ")";
 
     EXPECT_LT(static_cast<int>(rcutils_get_file_size(path.c_str())), bagfile_split_size);
   }
